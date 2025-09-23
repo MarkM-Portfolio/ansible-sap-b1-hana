@@ -1,0 +1,15 @@
+[DEFAULT]
+
+s3_bucket_region = {{ customer_region }}
+s3_bucket_name = {{ customer_accountid }}-{{ customer_name }}-hana-backups
+s3_bucket_folder = {{ customer_name }}-HANA-PROD
+s3_bucket_owner_account_id = {{ customer_accountid }}
+s3_sse_kms_arn = arn:aws:kms:{{ customer_region }}:{{ customer_accountid }}:key/{{ customer_kms }}
+agent_artifacts_s3_region = {{ customer_region }}
+modify_global_ini = modify
+hana_sid = {{ sid }}
+installation_directory = {{ shared_path }}
+backint_agent_home_directory = {{ shared_path }}/aws-backint-agent
+absolute_path_backint_agent = {{ shared_path }}/aws-backint-agent/aws-backint-agent
+log_file = {{ shared_path }}/aws-backint-agent/aws-backint-agent.log
+storage_id_path = {{ shared_path }}/aws-backint-agent/StorageId.json

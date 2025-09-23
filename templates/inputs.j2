@@ -1,0 +1,135 @@
+{
+    "aws": {
+      "region": "{{ customer_region }}",
+      "availability_zone": null,
+      "vpc_id": null,
+      "vpc_cidr_range": null,
+      "instance_type": null,
+      "instance_id": "{{ instance_id }}",
+      "subnet_id": null,
+      "route_table":null,
+      "app_security_group_id": null,
+      "db_security_group_id": null,
+      "private_ip": "{{ hana_private_ip }}",
+      "private_ip_1": null,
+      "encryption": false,
+      "ebs_kms_key_arn": null
+    },
+  
+    "database": {
+      "install_hana": false,
+      "install_media": null,
+      "hana_sid": null,
+      "hana_instance_nr": null,
+      "hana_others_vol_type": null,
+      "hana_data_vol_type": null,
+      "hana_log_vol_type": null,
+      "host_count": "1",
+      "master_password": null,
+      "secondary_hostname_prefix": null,
+      "install_backint": true,
+      "hana_db_schema": null,
+      "use_efs_hana": false,
+      "efs_hana_shared": null,
+      "efs_hana_backup": null,
+      "dbacockpit_user": true,
+      "overlay_ip": null,
+      "virtual_hostname": null,
+      "db_pacemaker_tag": null,
+      "db_primary_site": null,
+      "db_secondary_site": null
+    },
+  
+    "backint": {
+      "bucket_name": "hana-backups",
+      "bucket_folder": "HANA-PROD",
+      "bucket_account_id": null,
+      "kms_key_arn": null,
+      "agent_version": null,
+      "continue_on_failure": false,
+      "create_ebs_volume": false
+    },
+  
+    "sap": {
+      "install_sap": false,
+      "continue_on_sap_install_failure": false,
+      "product_id": null,
+      "sid": "{{ sid }}",
+      "sidadm_uid": null,
+      "sapsys_gid": null,
+      "sapadm_uid": null,
+      "usr_sap_vol_type": "gp2",
+      "sapmnt_vol_type": "gp2",
+      "others_vol_type": "gp2",
+      "use_efs_trans": false,
+      "efs_trans_mount_target": null,
+      "use_efs_sapmnt": false,
+      "efs_sapmnt_mount_target": null,
+      "pas_inst_nr": "00",
+      "pas_hostname": null,
+      "ascs_inst_nr": "01",
+      "ascs_hostname": null,
+      "ascs_overlay_ip": null,
+      "ascs_virtual_hostname": null,
+      "ers_inst_nr": "02",
+      "ers_hostname": null,
+      "ers_overlay_ip": null,
+      "ers_virtual_hostname": null,
+      "sap_pacemaker_tag": null,
+      "aas_host_count": null,
+      "aas_hostname_prefix": null,
+      "dialog_wp": null,
+      "batch_wp": null,
+      "master_password": null
+    },
+  
+    "launchwizard": {
+      "environment_type": "production",
+      "host_count": null,
+      "unique_id": null,
+      "stack_id": null,
+      "cw_parameter_store": null,
+      "cloudformation_wait_handle": null,
+      "egress_check_wait_handle": null,
+      "ddb_table": null,
+      "overall_status": null,
+      "role": null,
+      "deployment_pattern": null,
+      "log_group_name": null,
+      "nodeType": null,
+      "assets_s3_bucket": null,
+      "assets_s3_prefix": null,
+      "assets_s3_region_code": null,
+      "media_downloaded": false,
+      "enable_route53": false,
+      "shared_efs_id": null
+    },
+  
+    "sapmedia": {
+      "media_in_s3": false,
+      "media_in_efs": false,
+      "efs_id": null,
+      "swpm": null,
+      "sapcar": null,
+      "kernel": null,
+      "data_exports": null,
+      "database": null,
+      "database_client": null
+    },
+  
+    "os": {
+      "sles_byos_code": null,
+      "identifier": null,
+      "hostname": "{{ hostname }}",
+      "timezone": "UTC",
+      "proxy_server": null,
+      "no_proxy": "localhost,127.0.0.1,169.254.169.254,.internal",
+      "customer_no_proxy": null,
+      "domain": null
+    },
+  
+    "customizations": {
+      "configuration_scripts": null
+    }
+  }
+  

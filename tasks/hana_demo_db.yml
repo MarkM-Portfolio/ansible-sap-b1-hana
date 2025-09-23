@@ -1,0 +1,21 @@
+---
+- name: Extract Demo Databases
+  ansible.builtin.shell: |
+    unzip {{ backup_path }}/demo_databases/SBODEMOGB.zip -d {{ backup_path }}/demo_databases
+    unzip {{ backup_path }}/demo_databases/SBODEMOUS.zip -d {{ backup_path }}/demo_databases
+    echo "IMPORT \"SBODEMOGB\".\"*\" AS BINARY FROM '{{ backup_path }}/demo_databases/SBODEMOGB' WITH IGNORE EXISTING THREADS 10;" > {{ backup_path }}/demo_databases/SBODEMOGB/backup.sql
+    echo "IMPORT \"SBODEMOUS\".\"*\" AS BINARY FROM '{{ backup_path }}/demo_databases/SBODEMOUS' WITH IGNORE EXISTING THREADS 10;" > {{ backup_path }}/demo_databases/SBODEMOUS/backup.sql
+    chown -R {{ sid | lower }}adm:sapsys {{ backup_path }}/demo_databases/SBODEMOGB
+    chown -R {{ sid | lower }}adm:sapsys {{ backup_path }}/demo_databases/SBODEMOUS
+    chmod 755 {{ backup_path }}/demo_databases/SBODEMOGB/backup.sql
+    chmod 755 {{ backup_path }}/demo_databases/SBODEMOUS/backup.sql
+  register: hana_demo_db_extract
+
+- name: Import Demo Databases
+  become: true
+  become_user: "{{ sid | lower }}adm"
+  ansible.builtin.shell: |
+    {{ usr_sap_path }}/{{ sid }}/HDB{{ number }}/exe/hdbsql -u B1ADMIN -p {{ b1admin_password }} -I {{ backup_path }}/demo_databases/SBODEMOGB/backup.sql
+    {{ usr_sap_path }}/{{ sid }}/HDB{{ number }}/exe/hdbsql -u B1ADMIN -p {{ b1admin_password }} -I {{ backup_path }}/demo_databases/SBODEMOUS/backup.sql
+  register: hana_demo_db_import
+  

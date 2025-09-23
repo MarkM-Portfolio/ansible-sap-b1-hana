@@ -1,0 +1,173 @@
+---
+package_list:
+# SP5
+  - xauth
+  - rpm-build
+  - libssh2-1
+  - insserv-compat
+  - bc
+  - libstdc++6-32bit
+  - xmlstarlet
+  - glibc-i18ndata
+  - python3-cryptography
+  # - python2-pyOpenSSL
+  - tk
+  - libicu69
+  - nfs-kernel-server
+  - libcap-progs
+  # - libicu60_2
+  - libgtk-vnc-2_0-0
+  - libgthread-2_0-0
+  - acl
+  - libXxf86vm1
+  - firewalld
+  - libxml2-tools
+  - libSM6
+  - openssl
+  - samba
+  - samba-client
+  - libopenssl-1_1-devel
+  - jq
+  - libidn11
+  - xrdp
+
+# # SP3
+#   - xauth
+#   - rpm-build
+#   - libssh2-1
+#   - insserv-compat
+#   - bc
+#   - libstdc++6-32bit
+#   - xmlstarlet
+#   - glibc-i18ndata
+#   - python3-cryptography
+#   - python2-pyOpenSSL
+#   - tk
+#   - libicu69
+#   - nfs-kernel-server
+#   - libcap-progs
+#   - libicu60_2
+#   - libgtk-vnc-2_0-0
+#   - libgthread-2_0-0
+#   - acl
+#   - libXxf86vm1
+#   - firewalld
+#   - libxml2-tools
+#   - libSM6
+#   - openssl
+#   - samba
+#   - samba-client
+#   - libopenssl-1_1-devel
+#   - jq
+#   - libidn11
+  
+# # SP2
+#   - rpm-build
+#   - libssh2-1
+#   - insserv
+#   - bc
+#   - firewalld
+#   - nfs-kernel-server
+#   - libxml2-tools
+#   - xmlstarlet
+#   - libcap-progs
+#   - libltdl.so.7
+#   - python3-cryptography
+#   - tk
+#   - libicu69
+#   - vnc
+#   - libgthread-2_0-0
+#   - acl
+#   - libicu60_2
+#   - samba
+#   - openssl
+#   - python2-pyOpenSSL
+
+instance_id: ""
+hostname: ""
+customer_name: ""
+customer_region: ""
+hana_private_ip: ""
+hanab1_revision: ""
+hanab1_patch: ""
+hana_cockpit: ""
+hana_demo_db: ""
+crystal_reports_ver: "51058181"
+sld_windows_domain_action: ""
+primary_dc_ip: ""
+domain: ""
+domainuser: ""
+domainuser_password: ""
+hana_password: ""
+password_system_user: ""
+b1admin_password: ""
+b1site_password: ""
+# local repo vars
+sid: NDB
+number: "00"
+usr_sap_path: /usr/sap
+data_path: /hana/data
+log_path: /hana/log
+shared_path: /hana/shared
+backup_path: /hana/backup
+s3_media_bucket: "s3://{{ automation_accountid }}-saphana-bucket"
+
+devices:
+  - device: usrsap
+    mount: "{{ usr_sap_path }}"
+    size: 100G
+  - device: hanadata
+    mount: "{{ data_path }}"
+    size: 500G
+  - device: hanalog
+    mount: "{{ log_path }}"
+    size: 220G
+  - device: hanashared
+    mount: "{{ shared_path }}"
+    size: 250G
+  - device: hanabackup
+    mount: "{{ backup_path }}"
+    size: 100G
+
+template_files:
+  - filename: B1ADMIN_create.j2
+    dir: "{{ usr_sap_path }}/B1ADMIN_create.sql"
+  - filename: hdbbackint.j2
+    dir: "{{ usr_sap_path }}/hdbbackint.cfg"
+  - filename: hdblcm_cockpit.j2
+    dir: "{{ usr_sap_path }}/hdblcm_cockpit.cfg"
+    condition: hana_cockpit
+  - filename: hdblcm.j2
+    dir: "{{ usr_sap_path }}/hdblcm.cfg"
+  - filename: hdblcm.xml.j2
+    dir: "{{ usr_sap_path }}/hdblcm.xml"
+  - filename: inputs.j2
+    dir: "/root/install/scripts/inputs.json"
+  - filename: "{{ 'sapb1_2411.properties.j2' if hanab1_patch == 'B1H1000SP_2411-70004122' else 'sapb1.properties.j2' }}"
+    dir: "{{ usr_sap_path }}/sapb1.properties"
+  - filename: sapservices.j2
+    dir: "{{ usr_sap_path }}/sapservices"    
+  - filename: scriptserver.j2
+    dir: "{{ usr_sap_path }}/scriptserver.sql"
+
+s3pkgs:
+  - src: "{{ s3_media_bucket }}/rpm_pkgs/"
+    tgt: "/root/install/rpm_pkgs/"
+    
+s3media:
+  - src: "{{ s3_media_bucket }}/sapcar/"
+    tgt: "{{ usr_sap_path }}"
+  - src: "{{ s3_media_bucket }}/B1_client/{{ hanab1_patch }}/"
+    tgt: "{{ usr_sap_path }}/B1_client/"
+  - src: "{{ s3_media_bucket }}/hana_setup/{{ hanab1_revision }}/"
+    tgt: "{{ usr_sap_path }}/hana_setup/"
+  - src: "{{ s3_media_bucket }}/aws_launch_wizard_scripts/"
+    tgt: "/root/install/scripts/"
+  - src: "{{ s3_media_bucket }}/hana_cockpit/"
+    tgt: "{{ backup_path }}/cockpit/"
+    condition: hana_cockpit
+  - src: "{{ s3_media_bucket }}/hana_demo_databases/"
+    tgt: "{{ backup_path }}/demo_databases/"
+    condition: hana_demo_db
+  - src: "{{ s3_media_bucket }}/crystal_reports/{{ crystal_reports_ver }}/"
+    tgt: "{{ usr_sap_path }}/hana_setup/CrystalReports"

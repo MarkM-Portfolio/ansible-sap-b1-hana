@@ -1,0 +1,26 @@
+---
+- name: Install HANA Cockpit
+  ansible.builtin.shell: |
+    cat {{ usr_sap_path }}/hdblcm.xml | "{{ backup_path }}/cockpit/hdblcm.sh" --ignore=check_signature_file --read_password_from_stdin=xml --configfile={{ usr_sap_path }}/hdblcm_cockpit.cfg -b
+  async: 1000
+  poll: 0
+  register: hana_cockpit_install
+
+- name: Wait for HANA Cockpit installation to complete
+  ansible.builtin.async_status:
+    jid: "{{ hana_cockpit_install.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: 300
+  delay: 30
+  ignore_errors: True
+  changed_when: "'already in use' not in job_result.stderr"
+
+- name: Clean async job cache
+  ansible.builtin.async_status:
+    jid: "{{ hana_cockpit_install.ansible_job_id }}"
+    mode: cleanup
+
+- name: Wait 2 mins for HANA Cockpit to start
+  pause:
+    seconds: 120

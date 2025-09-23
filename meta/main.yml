@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  author: Mark Mon Monteros
+  description: SAP Hana DB Configuration Role
+  company: NTTData
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: SLES
+      versions:
+        - 15SP5
+  galaxy_tags:
+    - sap_hana_db
+dependencies: []

@@ -1,0 +1,2 @@
+#!/bin/sh
+LD_LIBRARY_PATH={{ usr_sap_path }}/{{ sid }}/HDB{{ number }}/exe:$LD_LIBRARY_PATH;export LD_LIBRARY_PATH;{{ usr_sap_path }}/{{ sid }}/HDB{{ number }}/exe/sapstartsrv pf={{ usr_sap_path }}/{{ sid }}/SYS/profile/{{ sid }}_HDB{{ number }}_{{ hostname }} -D -u {{ sid | lower }}adm

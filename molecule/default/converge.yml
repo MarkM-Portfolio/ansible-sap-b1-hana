@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: Include sap_hana_db
+      ansible.builtin.include_role:
+        name: sap_hana_db
+        

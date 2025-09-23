@@ -1,0 +1,74 @@
+---
+- name: Retrieve HANA status
+  become: true
+  become_user: "{{ sid | lower }}adm"
+  ansible.builtin.command:
+    cmd: "{{ usr_sap_path }}/{{ sid }}/HDB{{ number }}/HDB info"
+  register: hana_status
+  changed_when: False
+
+- name: Activate script server
+  community.sap_libs.sap_hdbsql:
+    sid: "{{ sid }}"
+    instance: "{{ number }}"
+    database: SYSTEMDB
+    user: SYSTEM
+    password: "{{ password_system_user }}"
+    filepath:
+      - "{{ usr_sap_path }}/scriptserver.sql"
+  register: scriptserver
+  when: '"hdbscriptserver" not in hana_status.stdout'
+
+- name: Add B1ADMIN user and grant permissions
+  community.sap_libs.sap_hdbsql:
+    sid: "{{ sid }}"
+    instance: "{{ number }}"
+    database: "{{ sid }}"
+    user: SYSTEM
+    password: "{{ password_system_user }}"
+    filepath:
+    - "{{ usr_sap_path }}/B1ADMIN_create.sql"
+  register: b1admin
+  changed_when:
+    - b1admin.rc == 0
+    - not b1admin.stderr_lines
+
+- name: Install HANA Client
+  ansible.builtin.shell: |
+    "{{ usr_sap_path }}/hana_setup/DATA_UNITS/SAP HANA CLIENT 2.0 FOR B1/LINX64SUSE/SAP_HANA_CLIENT/hdbinst" --path={{ usr_sap_path }}/hdbclient
+  args:
+    creates: "{{ usr_sap_path }}/hdbclient"
+
+- name: Install Application Function Library (AFL)
+  ansible.builtin.shell: |
+    "{{ usr_sap_path }}/hana_setup/DATA_UNITS/SAP HANA AFL 2.0 FOR B1/LINX64SUSE/SAP_HANA_AFL/hdbinst" --sid={{ sid }}
+  register: afl_install
+  changed_when:
+    - afl_install.rc == 0
+    - not afl_install.stderr_lines
+
+- name: show AFL installer result
+  ansible.builtin.debug:
+    var: afl_install
+
+- name: Check S3 bucket for HANA backups exists
+  ansible.builtin.shell: |
+    aws s3 ls s3://{{ customer_accountid }}-{{ customer_name }}-hana-backups --region {{ customer_region }}
+  register: backint_s3_check
+  changed_when: False
+  ignore_errors: True
+
+- name: Create S3 bucket for HANA backups
+  ansible.builtin.shell: |
+    aws s3 mb s3://{{ customer_accountid }}-{{ customer_name }}-hana-backups --region {{ customer_region }}
+  register: backint_s3
+  changed_when: "'make_bucket' in backint_s3.stdout"
+  when: backint_s3_check.rc != 0
+
+- name: Setup AWS Backint
+  ansible.builtin.shell: |
+    aws s3 cp s3://awssap-backint-agent/binary/latest/install-aws-backint-agent .
+    python install-aws-backint-agent -f {{ usr_sap_path }}/hdbbackint.cfg -m silent -a yes -d
+    rm -rf *aws-backint-agent*
+  when: backint_s3_check.rc == 0 or (backint_s3 is defined and backint_s3.changed)
+  

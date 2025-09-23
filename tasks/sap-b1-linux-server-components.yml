@@ -1,0 +1,54 @@
+---    
+- name: Install SAP HANA B1 (Business One) Server Components
+  ansible.builtin.shell: |
+    "{{ usr_sap_path }}/B1_client/Packages.Linux/ServerComponents/install" -i silent -f {{ usr_sap_path }}/sapb1.properties
+  args:
+    creates: "{{ usr_sap_path }}/SAPBusinessOne"
+  async: 1000
+  poll: 0
+  register: b1_install
+
+- name: Wait for SAP Business One installation to complete
+  ansible.builtin.async_status:
+    jid: "{{ b1_install.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: 300
+  delay: 30
+  ignore_errors: True
+  changed_when: "'already in use' not in job_result.stderr"
+
+- name: Clean async job cache
+  ansible.builtin.async_status:
+    jid: "{{ b1_install.ansible_job_id }}"
+    mode: cleanup
+
+- name: Restart SAP Authentication Service
+  ansible.builtin.service:
+    name: sapb1servertools-authentication
+    state: restarted
+  when: job_result.finished
+
+- name: Restart SAP Service
+  ansible.builtin.service:
+    name: sapb1servertools
+    state: restarted
+  when: job_result.finished
+
+- name: Modify shared folders
+  ansible.builtin.shell: |
+    sed -i 's/^\[B1_DEFAULT_REPOSITORY\]/[B1_client]/' /etc/samba/smb.conf
+    sed -i 's/guest ok = no/guest ok = yes/' /etc/samba/smb.conf
+    usr_owner=$(stat -c "%U" {{ usr_sap_path }}/SAPBusinessOne/B1_SHF)
+    grp_owner=$(stat -c "%G" {{ usr_sap_path }}/SAPBusinessOne/B1_SHF)
+    chown -R ${usr_owner}:${grp_owner} {{ usr_sap_path }}/hana_setup/CrystalReports
+    chmod 777 {{ usr_sap_path }}/hana_setup/CrystalReports
+    mv {{ usr_sap_path }}/hana_setup/CrystalReports {{ usr_sap_path }}/SAPBusinessOne/B1_SHF
+  changed_when: True
+  register: shared_folders
+
+- name: Restart SMB Service
+  ansible.builtin.systemd:
+    name: smb
+    state: restarted
+  when: shared_folders.changed

@@ -1,0 +1,227 @@
+---
+- name: Update zypper
+  community.general.zypper:
+    update_cache: yes
+    name: '*'
+    state: latest
+    disable_gpg_check: no
+    allow_vendor_change: false
+    disable_recommends: true
+    force_resolution: true
+
+- name: Download RPM packages
+  ansible.builtin.shell: |
+    aws s3 sync {{ item.src }} {{ item.tgt }}
+  register: rpm_pkgs
+  loop: "{{ s3pkgs }}"
+
+- name: Show download output
+  ansible.builtin.debug:
+    var: rpm_pkgs
+
+- name: Install RPM packages
+  ansible.builtin.shell: |
+    zypper install -y `find /root/install/rpm_pkgs -name "*.rpm" | grep -i "ledata"`
+    zypper install -y `find /root/install/rpm_pkgs -name "*.rpm" | grep -v "ledata"`
+
+- name: Ensure following packages are installed
+  community.general.zypper:
+    name: "{{ package_list }}"
+    state: present
+  notify:
+    - Ensure systemd service SMB is enabled
+    - Ensure XRDP session manager is started
+
+- name: Apply all available patches using zypper
+  community.general.zypper:
+    update_cache: yes
+    type: patch
+    name: '*'
+    state: latest
+    allow_vendor_change: false
+    disable_gpg_check: no
+    force_resolution: yes
+
+- name: Set default python binary
+  ansible.builtin.shell: |
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.6 1
+    update-alternatives --config python
+
+# For Single EBS Block Device
+- name: Check if device is mounted
+  ansible.builtin.shell: mount | grep /dev/nvme1n1
+  register: mount_check
+  ignore_errors: True
+
+# For Single EBS Block Device
+- name: Unmount device if mounted
+  ansible.builtin.shell:
+    umount /dev/nvme1n1
+  when: mount_check.stdout != ''
+
+# For Single EBS Block Device
+- name: Check if logical volumes exists
+  ansible.builtin.shell: lvdisplay
+  register: lvm_check
+  ignore_errors: True
+
+# For Single EBS Block Device
+- name: Create a physical volume
+  ansible.builtin.shell: pvcreate -ff /dev/nvme1n1 --yes
+  register: pvcreate_result
+  changed_when: pvcreate_result.rc == 0
+  when: lvm_check.stdout == ''
+
+# For Single EBS Block Device
+- name: Create a volume group
+  ansible.builtin.shell: vgcreate -ff vghana /dev/nvme1n1 --yes
+  register: vgcreate_result
+  changed_when: vgcreate_result.rc == 0
+  when: lvm_check.stdout == ''
+
+# For Single EBS Block Device
+- name: Create logical volumes
+  community.general.lvol:
+    vg: vghana
+    lv: "{{ item.device }}"
+    size: "{{ item.size }}"
+  loop: "{{ devices }}"
+  when: lvm_check.stdout == ''
+
+# For Single EBS Block Device
+- name: Create mount points
+  ansible.builtin.file:
+    path: "{{ item.mount }}"
+    state: directory
+  loop: "{{ devices }}"
+  when: lvm_check.stdout == ''
+
+# For Single EBS Block Device
+- name: Format logical volumes as XFS
+  community.general.filesystem:
+    fstype: xfs
+    dev: "/dev/vghana/{{ item.device }}"
+  loop: "{{ devices }}"
+  when: lvm_check.stdout == ''
+
+# For Single EBS Block Device
+- name: Mount logical volumes
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: "/dev/vghana/{{ item.device }}"
+    fstype: xfs
+    opts: defaults
+    state: mounted
+  loop: "{{ devices }}"
+  when: lvm_check.stdout == ''
+  
+- name: Ensure mounts persist in fstab
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: "/dev/vghana/{{ item.device }}"
+    fstype: xfs
+    opts: defaults
+    state: mounted
+    dump: 0
+    passno: 2
+  loop: "{{ devices }}"
+
+- name: Download media
+  ansible.builtin.shell: |
+    aws s3 sync {{ item.src }} {{ item.tgt }}
+  register: media_setup
+  loop: "{{ s3media }}"
+  loop_control:
+    label: "{{ item.src }}"
+  when: item.condition is not defined or item.condition
+
+- name: Show download output
+  ansible.builtin.debug:
+    var: media_setup
+
+- name: Get AWS Account ID
+  ansible.builtin.shell: |
+    aws sts get-caller-identity --query "Account" --output text
+  register: aws_account
+  changed_when: False
+
+- name: Get AWS KMS Key
+  ansible.builtin.shell: |
+    aws kms list-aliases --query "Aliases[?AliasName=='alias/ssm-kms-key'].TargetKeyId" --output text --region {{ customer_region }}
+  register: aws_kms_key
+  changed_when: False
+
+- name: Set Customer Account ID and KMS
+  ansible.builtin.set_fact:
+    customer_accountid: "{{ aws_account.stdout }}"
+    customer_kms: "{{ aws_kms_key.stdout }}"
+
+- name: Update template files
+  template:
+    src: "{{ item.filename }}"
+    dest: "{{ item.dir }}"
+  loop: "{{ template_files }}"
+  loop_control:
+    label: "{{ item.filename }}"
+  when: item.condition is not defined or item.condition
+
+- name: Ensure binaries are executable
+  ansible.builtin.shell: |
+    chmod 755 -R "{{ usr_sap_path }}/"
+    chmod 755 -R "/root/install/scripts/"
+
+- name: Find SAR files
+  ansible.builtin.shell: |
+    find {{ usr_sap_path }} {{ backup_path }} -name '*.SAR' | grep -i 'suse\|cockpit'
+  register: sar_files
+
+- name: Store SAR files
+  ansible.builtin.set_fact:
+    file_list: "{{ sar_files.stdout_lines }}"
+
+- name: Extract SAR Files
+  ansible.builtin.shell: |
+    base_dir=$(echo "{{ item }}" | sed 's:[^/]*$::')
+    cd "$base_dir"
+    echo "$base_dir" && pwd
+    {{ usr_sap_path }}/SAPCAR_LINUX_x86_64.EXE -xvf `ls | grep -i '.sar$'`
+  ignore_errors: True
+  loop: "{{ file_list }}"
+
+- name: Execute prerequisites
+  ansible.builtin.shell: |
+    cd /root/install/scripts
+    ./install.sh
+  async: 1000
+  poll: 0
+  register: prereq
+
+- name: Wait for prerequisites complete
+  ansible.builtin.async_status:
+    jid: "{{ prereq.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: 50
+  delay: 30
+  ignore_errors: True
+  changed_when: "'already in use' not in job_result.stderr"
+
+- name: Clean async job cache
+  ansible.builtin.async_status:
+    jid: "{{ prereq.ansible_job_id }}"
+    mode: cleanup
+  ignore_errors: True
+  
+- name: Update hosts mapping
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hana_private_ip }}{{ '\t' }}{{ hostname | lower }}"
+    insertafter: '^127\.0\.0\.1'
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ hostname }}"
+    use: systemd
+  notify:
+    - Reboot server
+    

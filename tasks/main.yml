@@ -1,0 +1,50 @@
+---
+- name: Check if HANA instance already in use
+  ansible.builtin.stat:
+    path: "{{ shared_path }}/{{ sid }}/HDB{{ number }}"
+  register: hana_instance
+
+- name: Check if SAP B1 Server Components already installed
+  ansible.builtin.stat:
+    path: "{{ usr_sap_path }}/SAPBusinessOne"
+  register: b1_components
+
+- name: Include OS prep tasks
+  ansible.builtin.include_tasks: os_prep.yml
+  tags:
+    - sap-os-prep
+
+- name: Force all notified handlers to run at this point, not waiting for normal sync points
+  ansible.builtin.meta: flush_handlers
+  
+- name: Include HANA install tasks
+  ansible.builtin.include_tasks: hana_install.yml
+  when: not hana_instance.stat.exists
+  tags:
+    - sap-hana
+    - hana
+    - installation
+
+- name: Include HANA post installation tasks
+  ansible.builtin.include_tasks: hana_post_install_steps.yml
+  tags:
+    - post-installation
+
+- name: Include SAP HANA B1 Server Components installation tasks
+  ansible.builtin.include_tasks: sap-b1-linux-server-components.yml
+  when: not b1_components.stat.exists
+  tags:
+    - b1-installation
+
+- name: Include HANA Cockpit installation tasks
+  ansible.builtin.include_tasks: hana_cockpit.yml
+  when: not b1_components.stat.exists and hana_cockpit
+  tags:
+    - hana-cockpit
+
+- name: Include Demo Databases installation tasks
+  ansible.builtin.include_tasks: hana_demo_db.yml
+  when: not b1_components.stat.exists and hana_demo_db
+  tags:
+    - hana-demo-db
+    

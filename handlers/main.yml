@@ -1,0 +1,17 @@
+---
+- name: Ensure systemd service SMB is enabled
+  ansible.builtin.systemd:
+    name: smb
+    state: started
+    enabled: True
+
+- name: Ensure XRDP session manager is started
+  ansible.builtin.systemd:
+    name: xrdp-sesman
+    state: started
+    enabled: True
+
+- name: Reboot server
+  ansible.builtin.reboot:
+    post_reboot_delay: 120
+    
